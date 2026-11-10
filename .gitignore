@@ -1,1 +1,56 @@
-data/
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Raw dataset files (exclude large raw logs & CSVs, preserve folder)
+data/raw/*
+!data/raw/.gitkeep
+
+# Processed artifacts (preserve runtime vocab and baseline files)
+data/processed/*
+!data/processed/.gitkeep
+!data/processed/*.json
+!data/processed/*.npy
+
+# Environment files
+.env
+.env.local

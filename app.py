@@ -1,13 +1,20 @@
-import streamlit as st
-import torch
-import json
-import numpy as np
 import os
 import sys
+import json
 import re
+import streamlit as st
+import torch
+import numpy as np
+
+# -----------------------------------------
+# Page Configuration (Must be first Streamlit command)
+# -----------------------------------------
+st.set_page_config(page_title="AI DB Firewall", layout="wide")
 
 # Add project root to sys path so we can import src modules
-sys.path.append(os.path.abspath('.'))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if BASE_DIR not in sys.path:
+    sys.path.append(BASE_DIR)
 
 from src.models.sql_models import SQLCNN
 from src.models.log_models import LogAnomalyLSTM
@@ -24,32 +31,39 @@ def load_sql_resources():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     # Load Vocabulary
-    with open('data/processed/sql_word2idx.json', 'r') as f:
+    vocab_path = os.path.join(BASE_DIR, 'data', 'processed', 'sql_word2idx.json')
+    with open(vocab_path, 'r', encoding='utf-8') as f:
         word2idx = json.load(f)
         
     # Load Model
     model = SQLCNN(vocab_size=len(word2idx)).to(device)
-    model.load_state_dict(torch.load('notebooks/SQL_CNN_best.pth', map_location=device, weights_only=True))
+    model_path = os.path.join(BASE_DIR, 'notebooks', 'SQL_CNN_best.pth')
+    model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
     model.eval()
     
     # Load SHAP Background
-    background_data = np.load('data/processed/shap_background.npy')
+    bg_path = os.path.join(BASE_DIR, 'data', 'processed', 'shap_background.npy')
+    background_data = np.load(bg_path)
     
     return device, word2idx, model, background_data
 
 @st.cache_resource
 def load_log_resources():
-    with open('data/processed/log_word2idx.json', 'r') as f:
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
+    vocab_path = os.path.join(BASE_DIR, 'data', 'processed', 'log_word2idx.json')
+    with open(vocab_path, 'r', encoding='utf-8') as f:
         log_word2idx = json.load(f)
         
-    log_model = LogAnomalyLSTM(vocab_size=len(log_word2idx), embed_dim=32, hidden_dim=64, output_dim=1)
-    log_model.load_state_dict(torch.load('notebooks/log_lstm_best.pth', map_location=torch.device('cpu'), weights_only=True))
+    log_model = LogAnomalyLSTM(vocab_size=len(log_word2idx), embed_dim=32, hidden_dim=64, output_dim=1).to(device)
+    model_path = os.path.join(BASE_DIR, 'notebooks', 'log_lstm_best.pth')
+    log_model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
     log_model.eval()
     
-    return log_word2idx, log_model
+    return device, log_word2idx, log_model
 
 device, sql_word2idx, sql_model, background_data = load_sql_resources()
-log_word2idx, log_model = load_log_resources()
+log_device, log_word2idx, log_model = load_log_resources()
 
 # Wrapper for SHAP to make predictions
 def predict_fn(queries_numpy):
@@ -62,12 +76,12 @@ def predict_fn(queries_numpy):
 # -----------------------------------------
 # 2. Streamlit UI Layout
 # -----------------------------------------
-st.set_page_config(page_title="AI DB Firewall", layout="wide")
 st.title("Hybrid AI Threat Detection System")
 st.markdown("This system intercepts SQL queries, scans them using a Deep Learning CNN, and monitors system logs via an LSTM network to detect infrastructure anomalies.")
 
 # Sidebar for Database Configuration
 st.sidebar.header("Oracle DB Configuration")
+st.sidebar.markdown("Configure your Oracle connection. Thick mode will automatically initialize if `ORACLE_CLIENT_DIR` is set.")
 db_user = st.sidebar.text_input("Username", value="admin")
 db_password = st.sidebar.text_input("Password", type="password")
 db_dsn = st.sidebar.text_input("DSN (e.g., localhost:1521/XEPDB1)", value="localhost:1521/XEPDB1")
@@ -154,7 +168,7 @@ with tab2:
                 seq = seq[:MAX_LEN]
                 
             # 3. Predict
-            tensor_input = torch.tensor(seq, dtype=torch.long).unsqueeze(0)
+            tensor_input = torch.tensor(seq, dtype=torch.long).unsqueeze(0).to(log_device)
             with torch.no_grad():
                 prob = log_model(tensor_input).item()
                 

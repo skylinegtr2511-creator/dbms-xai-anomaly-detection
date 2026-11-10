@@ -3,8 +3,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class SQLCNN(nn.Module):
-    def __init__(self, vocab_size, embed_dim=128, num_filters=100, filter_sizes=[3, 4, 5], dropout=0.5):
+    def __init__(self, vocab_size, embed_dim=128, num_filters=100, filter_sizes=None, dropout=0.5):
         super(SQLCNN, self).__init__()
+        if filter_sizes is None:
+            filter_sizes = [3, 4, 5]
+        self.filter_sizes = filter_sizes
         self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=0)
         self.convs = nn.ModuleList([
             nn.Conv1d(in_channels=embed_dim, out_channels=num_filters, kernel_size=k) 
@@ -35,6 +38,6 @@ class SQLLSTM(nn.Module):
         # lstm_out shape: (batch, seq_len, hidden_dim * 2)
         lstm_out, (hidden, cell) = self.lstm(embedded)
         # Extract the output of the final time step
-        final_hidden = torch.cat((hidden[-2,:,:], hidden[-1,:,:]), dim=1)
+        final_hidden = torch.cat((hidden[-2, :, :], hidden[-1, :, :]), dim=1)
         dropped = self.dropout(final_hidden)
         return self.fc(dropped)
